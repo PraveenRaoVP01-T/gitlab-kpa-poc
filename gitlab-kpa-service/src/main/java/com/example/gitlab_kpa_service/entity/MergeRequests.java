@@ -20,6 +20,8 @@ public class MergeRequests {
     private Long id;
     @Column(name = "gitlab_mr_id", unique = true, nullable = false)
     private Long gitlabMrId;
+    @Column(name = "gitlab_mr_iid")
+    private Long gitlabMrIID;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id")
     private Projects project;
@@ -38,4 +40,5 @@ public class MergeRequests {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant mergedAt;
+    private Instant closedAt;
 }

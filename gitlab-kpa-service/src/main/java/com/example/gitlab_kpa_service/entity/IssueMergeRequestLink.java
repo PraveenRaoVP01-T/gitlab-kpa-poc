@@ -14,15 +14,17 @@ import java.io.Serializable;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(IssueMRLinkId.class)
 public class IssueMergeRequestLink {
 
-    @Id
+    @EmbeddedId
+    private IssueMRLinkId id;
+
+    @MapsId("issueId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issue_id")
     private Issues issue;
 
-    @Id
+    @MapsId("mergeRequestId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merge_request_id")
     private MergeRequests mergeRequest;

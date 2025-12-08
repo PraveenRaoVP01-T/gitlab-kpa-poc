@@ -19,8 +19,11 @@ public class Issues {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String gitlabIssueId;
-    private Long projectId;
+    private Long gitlabIssueId;
+    private Long gitlabIssueIID;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "project_id")
+    private Projects project;
     private String title;
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -34,6 +37,8 @@ public class Issues {
     @CollectionTable(name = "issue_labels", joinColumns = @JoinColumn(name = "issue_id"))
     @Column(name = "label")
     private List<String> labels;
+
+    private String severity;
 
     private Instant createdAt;
     private Instant updatedAt;

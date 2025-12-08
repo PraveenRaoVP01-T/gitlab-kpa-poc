@@ -1,6 +1,9 @@
 package com.example.gitlab_kpa_service.service;
 
+import com.example.gitlab_kpa_service.entity.Projects;
 import com.example.gitlab_kpa_service.model.GitLabProjectsDTO;
+import com.example.gitlab_kpa_service.model.IssuesDTO;
+import com.example.gitlab_kpa_service.model.MergeRequestsDTO;
 import com.example.gitlab_kpa_service.utils.ApiEndpoints;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,9 +32,22 @@ public class ProjectService {
         return projectsResponse;
     }
 
-    public Mono<GitLabProjectsDTO> getProjectById(String projectId) {
-        String endpoint = ApiEndpoints.GET_PROJECT_BY_ID.formatted(projectId);
-        Mono<GitLabProjectsDTO> projectData = apiClient.get(endpoint, GitLabProjectsDTO.class);
-        return projectData;
+    public Flux<MergeRequestsDTO> getMergeRequestsForProject(Long projectId) {
+        String endpoint = ApiEndpoints.GET_ALL_MERGE_REQUESTS_BY_PROJECT_ID.formatted(projectId.toString());
+        Flux<MergeRequestsDTO> mergeRequestsForProject = apiClient.getFlux(endpoint, MergeRequestsDTO.class);
+        return mergeRequestsForProject;
     }
+
+    public Flux<IssuesDTO> getIssuesForProject(Long projectId) {
+        String endpoint = ApiEndpoints.GET_ISSUES_BY_PROJECT_ID.formatted(projectId.toString());
+        Flux<IssuesDTO> issuesForProject = apiClient.getFlux(endpoint, IssuesDTO.class);
+        return issuesForProject;
+    }
+
+    public Flux<MergeRequestsDTO> getMergeRequestsForIssues(Long projectId, Long issueIID) {
+        String endpoint = ApiEndpoints.GET_RELATED_MR_BY_ISSUE_IID.formatted(projectId.toString(), issueIID.toString());
+        Flux<MergeRequestsDTO> mergeRequestsForIssue = apiClient.getFlux(endpoint, MergeRequestsDTO.class);
+        return mergeRequestsForIssue;
+    }
+
 }

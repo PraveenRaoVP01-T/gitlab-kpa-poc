@@ -1,10 +1,13 @@
 package com.example.gitlab_kpa_service.controller;
 
 import com.example.gitlab_kpa_service.model.GitLabProjectsDTO;
+import com.example.gitlab_kpa_service.model.IssuesDTO;
+import com.example.gitlab_kpa_service.model.MergeRequestsDTO;
 import com.example.gitlab_kpa_service.service.ProjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
@@ -21,9 +24,24 @@ public class SampleController {
         this.projectService = projectService;
     }
 
-    @GetMapping
+    @GetMapping("/projects")
     public ResponseEntity<Flux<GitLabProjectsDTO>> getProjects(
     ) {
         return ResponseEntity.ok(projectService.getProjectsForUser());
+    }
+
+    @GetMapping("/mr/{projectId}")
+    public ResponseEntity<Flux<MergeRequestsDTO>> getMergeRequestsForProject(
+            @PathVariable Long projectId
+    ) {
+
+        return ResponseEntity.ok(projectService.getMergeRequestsForProject(projectId));
+    }
+
+    @GetMapping("/issues/{projectId}")
+    public ResponseEntity<Flux<IssuesDTO>> getIssuesForProject(
+            @PathVariable Long projectId
+    ) {
+        return ResponseEntity.ok(projectService.getIssuesForProject(projectId));
     }
 }
