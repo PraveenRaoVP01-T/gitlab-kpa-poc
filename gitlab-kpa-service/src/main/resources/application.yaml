@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: gitlab-kpa-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gitlab_analytics
+    username: postgres
+    password: root
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: none
+
+elastic:
+  host: localhost
+  port: 9200
+
+gitlab:
+  secret-token: ${{ GITLAB_SECRET-TOKEN }}
+  base-url: ${{ GITLAB_BASE-URL }}
+  username: ${{ GITLAB_USERNAME }}
