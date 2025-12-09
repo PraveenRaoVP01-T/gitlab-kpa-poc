@@ -3,6 +3,7 @@ package com.example.gitlab_kpa_service.service;
 import com.example.gitlab_kpa_service.entity.*;
 import com.example.gitlab_kpa_service.model.*;
 import com.example.gitlab_kpa_service.repository.*;
+import com.example.gitlab_kpa_service.utils.CommonUtils;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -10,7 +11,7 @@ import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -26,9 +27,13 @@ public class GitlabService {
 
     private final CommitRepository commitRepository;
 
+    private final CommitStatsRepository commitStatsRepository;
+    private final CommitFileRepository commitFileRepository;
+
 
     private List<Projects> saveProjectsToDb() {
         Flux<GitLabProjectsDTO> projectsFlux = projectService.getProjectsForUser();
+        List<Projects> existingProjects = projectsRepository.findAll();
         List<Projects> projectsList = projectsFlux.toStream().map(
                 project -> Projects.builder()
                         .gitlabProjectId(project.getId())
@@ -39,12 +44,18 @@ public class GitlabService {
                         .build()
         ).toList();
 
-        return projectsRepository.saveAll(projectsList);
+        projectsList = projectsList.stream()
+                .filter(project -> existingProjects.stream().noneMatch(ep -> ep.getGitlabProjectId().equals(project.getGitlabProjectId()))).toList();
+
+
+        projectsRepository.saveAll(projectsList);
+        return projectsRepository.findAll();
     }
 
     private List<MergeRequests> saveMergeRequestsToDb(List<Projects> projects) {
         List<MergeRequests> mergeRequests = new ArrayList<>();
-        for(Projects project : projects) {
+        for (Projects project : projects) {
+            List<MergeRequests> existingRequests = mergeRequestsRepository.findByProject(project);
             Flux<MergeRequestsDTO> mergeRequestsDTOFlux = projectService.getMergeRequestsForProject(project.getGitlabProjectId());
             List<MergeRequests> mergeRequestsToSave = mergeRequestsDTOFlux.toStream()
                     .map(mr -> MergeRequests.builder()
@@ -64,14 +75,18 @@ public class GitlabService {
                             .closedAt(mr.getClosedAt())
                             .build()).toList();
 
+            mergeRequestsToSave = mergeRequestsToSave.stream()
+                            .filter(mr -> existingRequests.stream().noneMatch(er -> er.getGitlabMrId().equals(mr.getGitlabMrId()))).toList();
+
             mergeRequests.addAll(mergeRequestsToSave);
         }
-        return mergeRequestsRepository.saveAll(mergeRequests);
+        mergeRequestsRepository.saveAll(mergeRequests);
+        return mergeRequestsRepository.findAll();
     }
 
     private List<Issues> saveIssuesToDb(List<Projects> projects) {
         List<Issues> issues = new ArrayList<>();
-        for(Projects project : projects) {
+        for (Projects project : projects) {
             Flux<IssuesDTO> issuesDTOFlux = projectService.getIssuesForProject(project.getGitlabProjectId());
             List<Issues> issuesToSave = issuesDTOFlux.toStream()
                     .map(issue -> Issues.builder()
@@ -92,14 +107,15 @@ public class GitlabService {
             issues.addAll(issuesToSave);
         }
 
-        return issuesRepository.saveAll(issues);
+        issuesRepository.saveAll(issues);
+        return issuesRepository.findAll();
     }
 
     @Transactional
     private List<IssueMergeRequestLink> saveIssueMergeRequests(List<Issues> issues) {
         List<IssueMergeRequestLink> issueMergeRequestLinks = new ArrayList<>();
 
-        for(Issues issue : issues) {
+        for (Issues issue : issues) {
             List<MergeRequests> mergeRequestsForProject = mergeRequestsRepository.findByProject(issue.getProject());
             Flux<MergeRequestsDTO> mergeRequestsForIssue = projectService.getMergeRequestsForIssues(issue.getProject().getGitlabProjectId(), issue.getGitlabIssueIID());
             List<MergeRequests> filteredMergeRequests = mergeRequestsForProject
@@ -124,55 +140,106 @@ public class GitlabService {
             issueMergeRequestLinks.addAll(issueMergeRequestLinksToSave);
         }
 
-        return issueMergeRequestLinkRepository.saveAll(issueMergeRequestLinks);
+        issueMergeRequestLinkRepository.saveAll(issueMergeRequestLinks);
+        return issueMergeRequestLinkRepository.findAll();
     }
 
     @Transactional
     private List<Commit> saveCommits(List<MergeRequests> mergeRequests) {
-        List<Commit> commits = new ArrayList<>();
-        List<CommitFile> commitFiles = new ArrayList<>();
-        List<CommitStats> commitStats = new ArrayList<>();
 
-        for(MergeRequests request: mergeRequests) {
-            List<Commit> commitInDb = commitRepository.findByMergeRequest(request);
-            Flux<CommitListDTO> commitDTOs = projectService.getCommitsByMergeRequest(request.getProject().getGitlabProjectId(), request.getGitlabMrIID());
-            List<CommitListDTO> newCommits = commitDTOs.toStream()
-                    .filter(commitDto -> commitInDb.stream().noneMatch(c -> c.getGitlabCommitId().equals(commitDto.getId())))
+        List<Commit> allNewCommits = new ArrayList<>();
+
+        for (MergeRequests request : mergeRequests) {
+
+            List<Commit> existingCommits = commitRepository.findByMergeRequest(request);
+
+            List<CommitListDTO> incomingCommits = projectService
+                    .getCommitsByMergeRequest(
+                            request.getProject().getGitlabProjectId(),
+                            request.getGitlabMrIID())
+                    .toStream()
                     .toList();
 
-            List<Commit> commitsToSave = newCommits.stream()
-                    .map(commit -> Commit.builder()
-                            .gitlabCommitId(commit.getId())
+            List<CommitListDTO> newCommitDtos = incomingCommits.stream()
+                    .filter(dto -> existingCommits.stream()
+                            .noneMatch(db -> db.getGitlabCommitId().equals(dto.getId())))
+                    .toList();
+
+            List<Commit> commitsToSave = newCommitDtos.stream()
+                    .map(dto -> Commit.builder()
+                            .gitlabCommitId(dto.getId())
                             .mergeRequest(request)
                             .project(request.getProject())
-                            .authorName(commit.getAuthorName())
-                            .authorEmail(commit.getAuthorEmail())
-                            .committedAt(commit.getCommittedAt())
-                            .title(commit.getTitle())
-                            .message(commit.getMessage())
-                            .build()).toList();
+                            .authorName(dto.getAuthorName())
+                            .authorEmail(dto.getAuthorEmail())
+                            .committedAt(dto.getCommittedAt())
+                            .title(dto.getTitle())
+                            .message(dto.getMessage())
+                            .build()
+                    )
+                    .toList();
 
-            commits.addAll(commitsToSave);
-            List<CommitStats> commitStatistics = commitsToSave.stream().map(
-                    commit -> {
-                        CommitDTO commitDTO = projectService.getCommitDataById(request.getProject().getGitlabProjectId(), commit.getGitlabCommitId()).block();
-                        if(commitDTO != null) {
-                            return CommitStats.builder()
-                                    .commit(commit)
-                                    .linesAdded(commitDTO.getStats().getAdditions())
-                                    .linesDeleted(commitDTO.getStats().getDeletions())
-                                    .netNewLines(commitDTO.getStats().getAdditions() - commitDTO.getStats().getDeletions())
-                                    .build();
-                        }
-                        return null;
-                    }
-            ).filter(Objects::nonNull).toList();
-
-            commitStats.addAll(commitStatistics);
+            allNewCommits.addAll(commitsToSave);
         }
 
-        commits = commitRepository.saveAll(commits);
+        List<Commit> savedCommits = commitRepository.saveAll(allNewCommits);
 
-        return commits;
+        List<CommitStats> allStats = new ArrayList<>();
+        List<CommitFile> allFiles = new ArrayList<>();
+
+        for (Commit commit : savedCommits) {
+
+            Long projectId = commit.getProject().getGitlabProjectId();
+            String commitId = commit.getGitlabCommitId();
+
+            CommitDTO commitDTO = projectService.getCommitDataById(projectId, commitId).block();
+            if (commitDTO != null) {
+                CommitStats stats = CommitStats.builder()
+                        .commit(commit)
+                        .linesAdded(commitDTO.getStats().getAdditions())
+                        .linesDeleted(commitDTO.getStats().getDeletions())
+                        .netNewLines(commitDTO.getStats().getAdditions() - commitDTO.getStats().getDeletions())
+                        .build();
+
+                allStats.add(stats);
+            }
+
+            List<CommitDiffDTO> diffs = projectService.getCommitDiffsById(projectId, commitId)
+                    .toStream()
+                    .toList();
+
+            List<CommitFile> files = diffs.stream().map(diff -> {
+                Map<String, Integer> computed = CommonUtils.calculateStats(diff.getDiff());
+
+                return CommitFile.builder()
+                        .commit(commit)
+                        .filePath(diff.getNewPath())
+                        .additions(computed.getOrDefault("additions", 0))
+                        .deletions(computed.getOrDefault("deletions", 0))
+                        .build();
+            }).toList();
+
+            allFiles.addAll(files);
+        }
+
+        commitStatsRepository.saveAll(allStats);
+        commitFileRepository.saveAll(allFiles);
+
+        return commitRepository.findAll();
+    }
+
+    public AllData getAllData() {
+        List<Projects> projects = saveProjectsToDb();
+        List<MergeRequests> mergeRequests = saveMergeRequestsToDb(projects);
+        List<Issues> issues = saveIssuesToDb(projects);
+        List<IssueMergeRequestLink> issueMergeRequestLinks = saveIssueMergeRequests(issues);
+        List<Commit> commits = saveCommits(mergeRequests);
+        return AllData.builder()
+                .projectsList(projects)
+                .mergeRequests(mergeRequests)
+                .issuesList(issues)
+                .issueMergeRequestLinks(issueMergeRequestLinks)
+                .commits(commits)
+                .build();
     }
 }

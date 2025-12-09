@@ -19,10 +19,7 @@ public class ProjectService {
 
     public Flux<GitLabProjectsDTO> getProjectsForUser() {
         String endpoint = ApiEndpoints.GET_ALL_PROJECTS_FOR_USER.formatted(userName);
-        Flux<GitLabProjectsDTO> projectsResponse = apiClient.getFlux(endpoint, GitLabProjectsDTO.class)
-                .doOnNext(project ->
-                    System.out.println("Project Id: " + project.getId())
-                );
+        Flux<GitLabProjectsDTO> projectsResponse = apiClient.getFlux(endpoint, GitLabProjectsDTO.class);
         return projectsResponse;
     }
 
@@ -54,6 +51,12 @@ public class ProjectService {
         String endpoint = ApiEndpoints.GET_COMMIT_DATA_BY_ID.formatted(projectId.toString(), commitSha);
         Mono<CommitDTO> commit = apiClient.get(endpoint, CommitDTO.class);
         return commit;
+    }
+
+    public Flux<CommitDiffDTO> getCommitDiffsById(Long projectId, String commitSha) {
+        String endpoint = ApiEndpoints.GET_COMMIT_DIFF_BY_ID.formatted(projectId.toString(), commitSha);
+        Flux<CommitDiffDTO> commitDiffs = apiClient.getFlux(endpoint, CommitDiffDTO.class);
+        return commitDiffs;
     }
 
 }

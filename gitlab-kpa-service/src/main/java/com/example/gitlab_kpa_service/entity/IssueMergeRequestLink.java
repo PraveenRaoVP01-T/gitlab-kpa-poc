@@ -1,5 +1,6 @@
 package com.example.gitlab_kpa_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,11 +23,13 @@ public class IssueMergeRequestLink {
     @MapsId("issueId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issue_id")
+    @JsonIgnore
     private Issues issue;
 
     @MapsId("mergeRequestId")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merge_request_id")
+    @JsonIgnore
     private MergeRequests mergeRequest;
 }
 

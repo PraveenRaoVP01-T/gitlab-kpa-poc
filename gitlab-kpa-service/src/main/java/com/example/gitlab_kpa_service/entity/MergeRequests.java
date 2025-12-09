@@ -1,5 +1,6 @@
 package com.example.gitlab_kpa_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,7 @@ public class MergeRequests {
     private Long gitlabMrIID;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id")
+    @JsonIgnore
     private Projects project;
     @Column(name = "source_branch")
     private String sourceBranch;

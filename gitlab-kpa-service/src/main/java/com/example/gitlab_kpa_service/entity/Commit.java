@@ -1,5 +1,6 @@
 package com.example.gitlab_kpa_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,10 +25,12 @@ public class Commit {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merge_request_id")
+    @JsonIgnore
     private MergeRequests mergeRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id")
+    @JsonIgnore
     private Projects project;
 
     @Column(name = "author_name")
@@ -44,4 +47,7 @@ public class Commit {
 
     @Column(columnDefinition = "TEXT")
     private String message;
+
+    @OneToOne(mappedBy = "commit")
+    private CommitStats commitStats;
 }
