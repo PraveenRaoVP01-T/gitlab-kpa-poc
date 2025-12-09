@@ -39,8 +39,8 @@ public class Commit {
     @Column(name = "committed_at")
     private Instant committedAt;
 
-    @Column(name = "issue_type")
-    private String issueType;
+    @Column(name = "title")
+    private String title;
 
     @Column(columnDefinition = "TEXT")
     private String message;

@@ -1,14 +1,12 @@
 package com.example.gitlab_kpa_service.service;
 
-import com.example.gitlab_kpa_service.entity.Projects;
-import com.example.gitlab_kpa_service.model.GitLabProjectsDTO;
-import com.example.gitlab_kpa_service.model.IssuesDTO;
-import com.example.gitlab_kpa_service.model.MergeRequestsDTO;
+import com.example.gitlab_kpa_service.model.*;
 import com.example.gitlab_kpa_service.utils.ApiEndpoints;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +42,18 @@ public class ProjectService {
         String endpoint = ApiEndpoints.GET_RELATED_MR_BY_ISSUE_IID.formatted(projectId.toString(), issueIID.toString());
         Flux<MergeRequestsDTO> mergeRequestsForIssue = apiClient.getFlux(endpoint, MergeRequestsDTO.class);
         return mergeRequestsForIssue;
+    }
+
+    public Flux<CommitListDTO> getCommitsByMergeRequest(Long projectId, Long mergeRequestIid) {
+        String endpoint = ApiEndpoints.GET_COMMITS_BY_MERGE_REQUEST_IID.formatted(projectId.toString(), mergeRequestIid.toString());
+        Flux<CommitListDTO> commits = apiClient.getFlux(endpoint, CommitListDTO.class);
+        return commits;
+    }
+
+    public Mono<CommitDTO> getCommitDataById(Long projectId, String commitSha) {
+        String endpoint = ApiEndpoints.GET_COMMIT_DATA_BY_ID.formatted(projectId.toString(), commitSha);
+        Mono<CommitDTO> commit = apiClient.get(endpoint, CommitDTO.class);
+        return commit;
     }
 
 }
