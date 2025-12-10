@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
@@ -17,11 +18,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DeveloperKpiService {
     private final CommitRepository commitRepository;
-    private final CommitFileRepository commitFileRepository;
-    private final CommitStatsRepository commitStatsRepository;
     private final MergeRequestsRepository mergeRequestsRepository;
     private final IssueMergeRequestLinkRepository issueMergeRequestLinkRepository;
-    private final IssuesRepository issuesRepository;
     private final ProjectsRepository projectsRepository;
     private final DeveloperActivityDailyRepository developerActivityDailyRepository;
 
@@ -167,10 +165,8 @@ public class DeveloperKpiService {
 
         return mergeRequests.stream()
                 .map(mr -> {
-                    // Fetch commits under this MR
                     List<Commit> mrCommits = commitRepository.findByMergeRequestAndDate(mr, today);
 
-                    // Fetch issues under this MR
                     List<Issues> issues = issueMergeRequestLinkRepository.getAllIssuesByMergeRequestsAndDateMatch(mr, today, today);
 
                     return MergeRequestsData.builder()
@@ -196,5 +192,99 @@ public class DeveloperKpiService {
                         .build()
                 )
                 .toList();
+    }
+
+    public List<DeveloperActivityDaily> formulateDeveloperActivityDaily(LocalDate date) {
+        LocalDate targetDate = date != null ? date : LocalDate.now();
+
+        List<Commit> allCommitsToday = commitRepository.findByCommittedAtDate(targetDate);
+
+        if (allCommitsToday.isEmpty()) {
+            return null;
+        }
+
+        Map<Projects, Map<String, List<Commit>>> byProjectThenDev =
+                allCommitsToday.stream()
+                        .collect(Collectors.groupingBy(
+                                Commit::getProject,
+                                Collectors.groupingBy(Commit::getAuthorName)
+                        ));
+
+        List<DeveloperActivityDaily> dailyRecords = new ArrayList<>();
+
+        for (Map.Entry<Projects, Map<String, List<Commit>>> projectEntry : byProjectThenDev.entrySet()) {
+
+            Projects project = projectEntry.getKey();
+
+            for (Map.Entry<String, List<Commit>> devEntry : projectEntry.getValue().entrySet()) {
+
+                String developer = devEntry.getKey();
+                List<Commit> devCommits = devEntry.getValue();
+
+                Set<MergeRequests> mrsForDeveloper = devCommits.stream()
+                        .map(Commit::getMergeRequest)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+
+                int totalAdded = 0;
+                int totalDeleted = 0;
+                int totalNet = 0;
+
+                int bugCommits = 0;
+                int featureCommits = 0;
+
+                int bugMinutes = 0;
+                int featureMinutes = 0;
+
+                for (Commit commit : devCommits) {
+                    CommitStats stats = commit.getCommitStats();
+                    if (stats != null) {
+                        totalAdded += stats.getLinesAdded();
+                        totalDeleted += stats.getLinesDeleted();
+                        totalNet += stats.getNetNewLines();
+                    }
+
+                    List<Issues> issues = issueMergeRequestLinkRepository
+                            .getAllIssuesByMergeRequests(commit.getMergeRequest());
+
+                    if (issues.isEmpty()) {
+                        featureCommits++;
+                        continue;
+                    }
+
+                    bugCommits++;
+
+                    for (Issues issue : issues) {
+                        if (issue.getClosedAt() != null &&
+                                issue.getClosedAt().atZone(ZoneId.systemDefault()).toLocalDate().equals(targetDate)) {
+                            long minutes = Duration.between(issue.getCreatedAt(), issue.getClosedAt()).toMinutes();
+                            bugMinutes += (int) minutes;
+                        } else {
+                            featureMinutes += 15;
+                        }
+                    }
+                }
+
+                DeveloperActivityDaily daily = DeveloperActivityDaily.builder()
+                        .project(project)
+                        .developer(developer)
+                        .activityDate(targetDate)
+                        .commitsCount(devCommits.size())
+                        .mrsCount(mrsForDeveloper.size())
+                        .linesAdded(totalAdded)
+                        .linesDeleted(totalDeleted)
+                        .netNewLines(totalNet)
+                        .bugFixTimeMinutes(bugMinutes)
+                        .featureDevTimeMinutes(featureMinutes)
+                        .bugCommits(bugCommits)
+                        .featureCommits(featureCommits)
+                        .build();
+
+                dailyRecords.add(daily);
+            }
+        }
+
+        return developerActivityDailyRepository.saveAll(dailyRecords);
+
     }
 }

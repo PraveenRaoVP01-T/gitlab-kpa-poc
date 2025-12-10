@@ -2,6 +2,11 @@ spring:
   application:
     name: gitlab-kpa-service
 
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration
+      - org.springframework.boot.elasticsearch.autoconfigure.ElasticsearchClientAutoConfiguration
+
   datasource:
     url: jdbc:postgresql://localhost:5432/gitlab_analytics
     username: postgres
@@ -14,6 +19,7 @@ spring:
 elastic:
   host: localhost
   port: 9200
+  scheme: http
 
 gitlab:
   secret-token: ${{ GITLAB_SECRET-TOKEN }}

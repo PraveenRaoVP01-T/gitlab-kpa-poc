@@ -18,4 +18,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
 
     @Query("SELECT c FROM Commit c WHERE c.mergeRequest = :mr AND DATE(c.committedAt) = DATE(:today)")
     List<Commit> findByMergeRequestAndDate(MergeRequests mr, LocalDate today);
+
+    @Query("SELECT c FROM Commit c WHERE DATE(c.committedAt) = DATE(:today)")
+    List<Commit> findByCommittedAtDate(LocalDate today);
 }
